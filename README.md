@@ -5,6 +5,7 @@ I just star my path in C development and can write shitcode or can not know some
 
 ### Complilation
 ```bash
+$ git clone https://github.com/Lookins01/cli-sudoku.git && cd cli-sudoku
 $ gcc cli_sudoku.c -o sudoku -I./
 $ ./sudoku
 ```
