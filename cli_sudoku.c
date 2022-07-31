@@ -1,9 +1,66 @@
-#include <stdio.h>
+#include <sys/ioctl.h>
 #include <termios.h>
-#include <unistd.h>     
-#include <time.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <ctype.h>
+#include <time.h>
+
+
+int max(int first, int second) 
+{
+  return (first > second) ? first : second;
+}
+
+struct Screen {
+  int length; 
+  int max_width;
+};
+
+
+void get_screen_max_size(struct Screen *screen) 
+{
+  struct winsize console;  
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &console);
+  screen->max_width = console.ws_col - 1;
+}
+
+
+void print(struct Screen *screen, char line[], ...) {
+  get_screen_max_size(screen);
+  va_list vargs;
+  va_start(vargs, line);
+  char written_line[screen->max_width];
+  int line_len = vsprintf(written_line, line, vargs);
+  if (line_len > screen->max_width) {
+    printf("Can't write more than max width symbols!"); 
+    exit(1);
+  }
+
+  printf(written_line);
+  
+  for (int i = 0; i < line_len; i++)
+    if (written_line[i] == '\n')
+      screen->length += 1;
+
+}
+
+
+void clear_screen(struct Screen *screen)
+{
+  int screen_length = screen->length;
+  for (int i = 0; i < screen_length; i++) {
+    printf("\033[A");
+    for (int j = 0; j < screen->max_width; j++) { 
+      printf(" ");
+    }
+    printf("\r");
+  }
+  screen->max_width = 0;
+  screen->length = 0;
+}
 
 
 int *get_neighbors(int **field, int *neighbors, int x, int y)
@@ -97,29 +154,29 @@ void open_random_cells(int **open_cells, int open_perstange) {
 } 
 
 
-void print_field(int **field, int **open_cells, int c_row, int c_col, int lives, int tips, int is_correct_choice)
+void print_field(struct Screen *screen, int **field, int **open_cells, int c_row, int c_col, int lives, int tips, int is_correct_choice)
 {
   for (int i = 0; i < 9; i++) {
     for (int j = 0; j < 9; j++) {
-      if (c_row == i && c_col == j) printf("\033[1;30m\e[104m");
+      if (c_row == i && c_col == j) print(screen, "\033[1;30m\e[104m");
       else if ((3 * (c_row/3) == 3 * (i/3)) &&(3 * (c_col/3) == 3 * (j/3))) 
-        printf("\e[30m\e[104m");
-      else if (c_row == i) printf("\e[0;30m\e[104m"); 
-      else if (c_col == j) printf("\e[0;30m\e[104m");
+        print(screen, "\e[30m\e[104m");
+      else if (c_row == i) print(screen, "\e[0;30m\e[104m"); 
+      else if (c_col == j) print(screen, "\e[0;30m\e[104m");
 
-      else if (field[i][j] == field[c_row][c_col] && open_cells[c_row][c_col] == 1) printf("\033[1;30m\e[44m");
-      else printf("\e[0;30m\e[44m");
+      else if (field[i][j] == field[c_row][c_col] && open_cells[c_row][c_col] == 1) print(screen, "\033[1;30m\e[44m");
+      else print(screen, "\e[0;30m\e[44m");
       
       if (open_cells[i][j] == 1) 
-        printf(" %d \033[0m", field[i][j]);
+        print(screen, " %d \033[0m", field[i][j]);
       else if (i == c_row && j == c_col)
         if (is_correct_choice == 1) {
-          printf("[ ]\033[0m");
+          print(screen, "[ ]\033[0m");
         } else {
-          printf("\e[1;91m[ ]\033[0m");
+          print(screen, "\e[1;91m[ ]\033[0m");
         } 
       else 
-        printf("   \033[0m");
+        print(screen, "   \033[0m");
 
       if ((j + 1) % 3 == 0 && j < 8) {
         if (i == c_row) printf("\e[104m│\033[0m");
@@ -220,7 +277,7 @@ int **generate_field()
 }
 
 
-int game()
+int game(struct Screen *screen)
 { 
   int **field = generate_field();    
   int cursor_row = 0, cursor_col = 0;
@@ -243,7 +300,7 @@ int game()
   int lives = 5;
   int tips = 1;
   int is_correct_choice = 1;
-  print_field(field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+  print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
   while (lives > 0) {
     char a = getchar();
     switch (a) {
@@ -275,7 +332,7 @@ int game()
         if (open_cells[cursor_row][cursor_col] == 1) 
            break;
         if (isdigit(a)) {
-          for (int i = 0; i < 21; i++) printf(" ");
+          for (int i = 0; i < 21; i++) print(screen, " ");
           if (field[cursor_row][cursor_col] == a - '0') { 
             open_cells[cursor_row][cursor_col] = 1;
             is_correct_choice = 1;
@@ -286,44 +343,39 @@ int game()
          break;
       }
     }
-    printf("\033[11A\r");  
-    print_field(field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+    print(screen, "\033[11A\r");  
+    print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
     is_correct_choice = 1;
     if (is_all_cells_open(open_cells) == 1)
       break;  
   }
   
-  printf("\n");
+  clear_screen(screen);
   if (lives == 0) {
-    printf("┏━━━━━━━━━━━━━┓\n\e[0m");
-    printf("┃  \e[31mYou lose!  \e[0m┃\n"); 
-    printf("┗━━━━━━━━━━━━━┛\n\e[0m");
+    print(screen, "┏━━━━━━━━━━━━━┓\n\e[0m");
+    print(screen, "┃  \e[31mYou lose!  \e[0m┃\n"); 
+    print(screen, "┗━━━━━━━━━━━━━┛\n\e[0m");
   } else {
-    printf("┏━━━━━━━━━━━━┓\n\e[0m");
-    printf("┃  \e[32mYou win!  \e[0m┃\n"); 
-    printf("┗━━━━━━━━━━━━┛\n\e[0m");  
+    print(screen, "┏━━━━━━━━━━━━┓\n\e[0m");
+    print(screen, "┃  \e[32mYou win!  \e[0m┃\n"); 
+    print(screen, "┗━━━━━━━━━━━━┛\n\e[0m");  
   }
-  
+  sleep(1);
+  clear_screen(screen);
   return 0;
 }
 
 
-int print_help()
+int start(struct Screen *screen)
 {
- printf("WASD - control\n");
-}
-
-
-int start()
-{
-  printf("Hello in Sudoku Game by Lookins!\n");
-  printf("\n");
-  printf("Controls:\n");
-  printf("   \e[32mWASD\e[0m - to move cursor,\n");
-  printf("   \e[32m1-9\e[0m  - open cell with it number.\n");
-  printf("\n");
-  printf("Press \e[1;32mS\e[0m to start game.\n");
-  printf("Press \e[1:32mX\e[0m to exit programm.\n");
+  print(screen, "Hello in Sudoku Game by Lookins!\n");
+  print(screen, "\n");
+  print(screen, "Controls:\n");
+  print(screen, "   \e[32mWASD\e[0m - to move cursor,\n");
+  print(screen, "   \e[32m1-9\e[0m  - open cell with it number.\n");
+  print(screen, "\n");
+  print(screen, "Press \e[1;32mS\e[0m to start game.\n");
+  print(screen, "Press \e[1:32mX\e[0m to exit programm.\n");
   
   int start_game = 0;
   while (!start_game) {
@@ -339,37 +391,36 @@ int start()
         break;
     }
   }
-  for (int i = 0; i < 8; i++) {
-    printf("\e[A\r");
-    for (int j = 0; j < 35; j++) 
-      printf(" ");
-    printf("\r");
-  }
+  clear_screen(screen);
   return 0;  
 }
 
 
 int main()
 {
+  // init screen struct to easy print manipulation
+  struct Screen screen;
+  get_screen_max_size(&screen);
+  screen.max_width = 0;
+  screen.length = 0;
+
   // seet seed for rand
   srand(time(NULL));
+  
   // set terminal settings to ICANON and ECHO
   static struct termios oldt, newt;
-
   tcgetattr( STDIN_FILENO, &oldt);
   newt = oldt;
-
   newt.c_lflag &= ~(ICANON | ECHO);          
-
   tcsetattr( STDIN_FILENO, TCSANOW, &newt);
 
   // greeting and explain how play
-  int result = start();
+  int result = start(&screen);
   
   // game 
   // TODO: Ask to play again if user lose
   if (result == 0)
-      game();
+      game(&screen);
 
   // Set back terminal settings
   tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
