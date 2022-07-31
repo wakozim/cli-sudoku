@@ -44,7 +44,6 @@ void print(struct Screen *screen, char line[], ...) {
   for (int i = 0; i < line_len; i++)
     if (written_line[i] == '\n')
       screen->length += 1;
-
 }
 
 
@@ -58,7 +57,7 @@ void clear_screen(struct Screen *screen)
     }
     printf("\r");
   }
-  screen->max_width = 0;
+  
   screen->length = 0;
 }
 
@@ -179,38 +178,38 @@ void print_field(struct Screen *screen, int **field, int **open_cells, int c_row
         print(screen, "   \033[0m");
 
       if ((j + 1) % 3 == 0 && j < 8) {
-        if (i == c_row) printf("\e[104m│\033[0m");
-        else printf("\e[44m│\033[0m"); 
+        if (i == c_row) print(screen, "\e[104m│\033[0m");
+        else print(screen, "\e[44m│\033[0m"); 
       }
       
     }
 
     if (i == 0) {
-      printf("   \e[44m┏\e[0m");
+      print(screen, "   \e[44m┏\e[0m");
       for (int i = 0; i < 11; i++) {
-        printf("\e[44m━");
+        print(screen, "\e[44m━");
       }
-      printf("\e[44m┓\e[0m");
+      print(screen, "\e[44m┓\e[0m");
     } else if (i == 1)
-      printf("   \e[44m┃ Lives:  %d ┃\e[0m", lives);
+      print(screen, "   \e[44m┃ Lives:  %d ┃\e[0m", lives);
     else if (i == 2)
-      printf("   \e[44m┃ Tips:   %d ┃\e[0m", tips);
+      print(screen, "   \e[44m┃ Tips:   %d ┃\e[0m", tips);
 
-    printf("\n");
+    print(screen, "\n");
     if ((i + 1) % 3 == 0 && i < 8) {
       for (int j = 0; j < 9*3 + 2; j++) 
-        if (j > 0 && (j+1) % 10 == 0) printf("\e[44m┼\033[0m");
-        else if (j < 10 && c_col == (j) / 3) printf("\e[104m─\033[0m");
-        else if (j > 9 && j < 20 && c_col == (j-1) / 3) printf("\e[104m─\033[0m");
-        else if (j > 19 && c_col == (j-2) / 3) printf("\e[104m─\033[0m");
-        else printf("\e[44m─\e[0m");
+        if (j > 0 && (j+1) % 10 == 0) print(screen, "\e[44m┼\033[0m");
+        else if (j < 10 && c_col == (j) / 3) print(screen, "\e[104m─\033[0m");
+        else if (j > 9 && j < 20 && c_col == (j-1) / 3) print(screen, "\e[104m─\033[0m");
+        else if (j > 19 && c_col == (j-2) / 3) print(screen, "\e[104m─\033[0m");
+        else print(screen, "\e[44m─\e[0m");
       if (i + 1 == 3) {
-        printf("   \e[44m┗");
+        print(screen, "   \e[44m┗");
         for (int i = 0; i < 11; i++)
-          printf("━");
-        printf("┚\e[0m");
+          print(screen, "━");
+        print(screen, "┚\e[0m");
       }
-      printf("\n");
+      print(screen, "\n");
     }
   }
 }
@@ -332,7 +331,6 @@ int game(struct Screen *screen)
         if (open_cells[cursor_row][cursor_col] == 1) 
            break;
         if (isdigit(a)) {
-          for (int i = 0; i < 21; i++) print(screen, " ");
           if (field[cursor_row][cursor_col] == a - '0') { 
             open_cells[cursor_row][cursor_col] = 1;
             is_correct_choice = 1;
@@ -343,7 +341,7 @@ int game(struct Screen *screen)
          break;
       }
     }
-    print(screen, "\033[11A\r");  
+    clear_screen(screen); 
     print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
     is_correct_choice = 1;
     if (is_all_cells_open(open_cells) == 1)
@@ -360,7 +358,7 @@ int game(struct Screen *screen)
     print(screen, "┃  \e[32mYou win!  \e[0m┃\n"); 
     print(screen, "┗━━━━━━━━━━━━┛\n\e[0m");  
   }
-  sleep(1);
+  sleep(2);
   clear_screen(screen);
   return 0;
 }
@@ -387,12 +385,12 @@ int start(struct Screen *screen)
         break;
       case 'x':
       case 'X':
-        return 1;
+        return 0;
         break;
     }
   }
   clear_screen(screen);
-  return 0;  
+  return start_game;  
 }
 
 
@@ -414,14 +412,9 @@ int main()
   newt.c_lflag &= ~(ICANON | ECHO);          
   tcsetattr( STDIN_FILENO, TCSANOW, &newt);
 
-  // greeting and explain how play
-  int result = start(&screen);
-  
   // game 
-  // TODO: Ask to play again if user lose
-  if (result == 0)
-      game(&screen);
-
+  while (start(&screen))
+    game(&screen);
   // Set back terminal settings
   tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
   return 0;
