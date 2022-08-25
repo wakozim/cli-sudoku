@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <time.h>
 
 
@@ -153,7 +154,7 @@ void open_random_cells(int **open_cells, int open_perstange) {
 } 
 
 
-void print_field(struct Screen *screen, int **field, int **open_cells, int c_row, int c_col, int lives, int tips, int is_correct_choice)
+void color_print_field(struct Screen *screen, int **field, int **open_cells, int c_row, int c_col, int lives, int tips, int is_correct_choice)
 {
   for (int i = 0; i < 9; i++) {
     for (int j = 0; j < 9; j++) {
@@ -208,6 +209,52 @@ void print_field(struct Screen *screen, int **field, int **open_cells, int c_row
         for (int i = 0; i < 11; i++)
           print(screen, "━");
         print(screen, "┚\e[0m");
+      }
+      print(screen, "\n");
+    }
+  }
+}
+
+void print_field(struct Screen *screen, int **field, int **open_cells, int c_row, int c_col, int lives, int tips)
+{
+  for (int i = 0; i < 9; i++) {
+    for (int j = 0; j < 9; j++) {
+      
+      if (open_cells[i][j] == 1 && i == c_row && j == c_col) 
+          print(screen, "[%d]", field[i][j]);
+      else if (open_cells[i][j] == 1)
+          print(screen, " %d ", field[i][j]);
+      else if (i == c_row && j == c_col)
+          print(screen, "[ ]");
+      else 
+          print(screen, "   ");
+
+      if ((j + 1) % 3 == 0 && j < 8) {
+          print(screen, "│");
+      } 
+    }
+
+    if (i == 0) {
+      print(screen, "   ┏");
+      for (int i = 0; i < 11; i++) {
+        print(screen, "━");
+      }
+      print(screen, "┓");
+    } else if (i == 1)
+      print(screen, "   ┃ Lives:  %d ┃", lives);
+    else if (i == 2)
+      print(screen, "   ┃ Tips:   %d ┃", tips);
+
+    print(screen, "\n");
+    if ((i + 1) % 3 == 0 && i < 8) {
+      for (int j = 0; j < 9*3 + 2; j++) 
+        if (j > 0 && (j+1) % 10 == 0) print(screen, "┼");
+        else print(screen, "─");
+      if (i + 1 == 3) {
+        print(screen, "   ┗");
+        for (int i = 0; i < 11; i++)
+          print(screen, "━");
+        print(screen, "┚");
       }
       print(screen, "\n");
     }
@@ -276,7 +323,7 @@ int **generate_field()
 }
 
 
-int game(struct Screen *screen)
+int game(struct Screen *screen, bool colorless)
 { 
   int **field = generate_field();    
   int cursor_row = 0, cursor_col = 0;
@@ -299,7 +346,11 @@ int game(struct Screen *screen)
   int lives = 5;
   int tips = 1;
   int is_correct_choice = 1;
-  print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+  if (colorless == false)
+      color_print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+  else
+      print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips);
+  
   while (lives > 0) {
     char a = getchar();
     switch (a) {
@@ -342,21 +393,39 @@ int game(struct Screen *screen)
       }
     }
     clear_screen(screen); 
-    print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+    
+    
+    if (colorless == false)
+        color_print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips, is_correct_choice);
+    else
+        print_field(screen, field, open_cells, cursor_row, cursor_col, lives, tips);
+    
     is_correct_choice = 1;
     if (is_all_cells_open(open_cells) == 1)
       break;  
   }
   
   clear_screen(screen);
-  if (lives == 0) {
-    print(screen, "┏━━━━━━━━━━━━━┓\n\e[0m");
-    print(screen, "┃  \e[31mYou lose!  \e[0m┃\n"); 
-    print(screen, "┗━━━━━━━━━━━━━┛\n\e[0m");
+  if (colorless == false) {
+      if (lives == 0) {
+          print(screen, "┏━━━━━━━━━━━━━┓\n\e[0m");
+          print(screen, "┃  \e[31mYou lose!  \e[0m┃\n"); 
+          print(screen, "┗━━━━━━━━━━━━━┛\n\e[0m");
+      } else {
+          print(screen, "┏━━━━━━━━━━━━┓\n\e[0m");
+          print(screen, "┃  \e[32mYou win!  \e[0m┃\n"); 
+          print(screen, "┗━━━━━━━━━━━━┛\n\e[0m");  
+      }
   } else {
-    print(screen, "┏━━━━━━━━━━━━┓\n\e[0m");
-    print(screen, "┃  \e[32mYou win!  \e[0m┃\n"); 
-    print(screen, "┗━━━━━━━━━━━━┛\n\e[0m");  
+      if (lives == 0) {
+          print(screen, "┏━━━━━━━━━━━━━┓\n");
+          print(screen, "┃  You lose!  ┃\n"); 
+          print(screen, "┗━━━━━━━━━━━━━┛\n");
+      } else {
+          print(screen, "┏━━━━━━━━━━━━┓\n");
+          print(screen, "┃  You win!  ┃\n"); 
+          print(screen, "┗━━━━━━━━━━━━┛\n");  
+      }
   }
   sleep(2);
   clear_screen(screen);
@@ -364,17 +433,31 @@ int game(struct Screen *screen)
 }
 
 
-int start(struct Screen *screen)
+int start(struct Screen *screen, bool colorless)
 {
-  print(screen, "Hello in Sudoku Game by Lookins!\n");
-  print(screen, "\n");
-  print(screen, "Controls:\n");
-  print(screen, "   \e[32mWASD\e[0m - to move cursor,\n");
-  print(screen, "   \e[32m1-9\e[0m  - open cell with it number.\n");
-  print(screen, "\n");
-  print(screen, "Press \e[1;32mS\e[0m to start game.\n");
-  print(screen, "Press \e[1:32mX\e[0m to exit programm.\n");
+  if (colorless == false)
+  {
+      print(screen, "Hello in Sudoku Game by Lookins!\n");
+      print(screen, "\n");
+      print(screen, "Controls:\n");
+      print(screen, "   \e[32mWASD\e[0m - to move cursor,\n");
+      print(screen, "   \e[32m1-9\e[0m  - open cell with it number.\n");
+      print(screen, "\n");
+      print(screen, "Press \e[1;32mS\e[0m to start game.\n");
+      print(screen, "Press \e[1:32mX\e[0m to exit programm.\n"); 
+  } 
+  else 
+  {
+      print(screen, "Hello in Sudoku Game by Lookins!\n");
+      print(screen, "\n");
+      print(screen, "Controls:\n");
+      print(screen, "   WASD - to move cursor,\n");
+      print(screen, "   1-9  - open cell with it number.\n");
+      print(screen, "\n");
+      print(screen, "Press S to start game.\n");
+      print(screen, "Press X to exit programm.\n");
   
+  }
   int start_game = 0;
   while (!start_game) {
     char cmd = getchar();
@@ -394,8 +477,18 @@ int start(struct Screen *screen)
 }
 
 
-int main()
+int main(int argc, char **argv)
 {
+  bool colorless = false;
+
+  if (argc > 1) 
+  {
+      for (int i = 1; i < argc; i++) 
+      {
+          colorless = !strcmp(argv[i], "--colorless") || !strcmp(argv[i], "-c");
+      }
+  }
+  
   // init screen struct to easy print manipulation
   struct Screen screen;
   get_screen_max_size(&screen);
@@ -413,8 +506,8 @@ int main()
   tcsetattr( STDIN_FILENO, TCSANOW, &newt);
 
   // game 
-  while (start(&screen))
-    game(&screen);
+  while (start(&screen, colorless))
+    game(&screen, colorless);
   // Set back terminal settings
   tcsetattr( STDIN_FILENO, TCSANOW, &oldt);
   return 0;
